@@ -27,8 +27,8 @@ class GeminiOverlay:
         self.root.geometry("800x500+200+200")  # Set a static height
         self.root.configure(fg_color="black")
 
-        # Initialize conversation history
-        self.conversation_history = []  # List to store conversation entries
+        # Initialize conversation history for API context
+        self.api_conversation_history = []  # List to store conversation entries
 
         # Configuration settings
         self.is_shown = False
@@ -107,7 +107,7 @@ class GeminiOverlay:
 
     def setup_keyboard_listener(self):
         # Initialize keyboard tracking variables
-        self._alt_pressed = False
+        self._ctrl_pressed = False
         self._space_pressed = False
         self.keyboard_listener = keyboard.Listener(
             on_press=self.on_press,
@@ -117,11 +117,11 @@ class GeminiOverlay:
 
     @property
     def hotkey_pressed(self):
-        return self._alt_pressed and self._space_pressed
+        return self._ctrl_pressed and self._space_pressed
 
     def on_press(self, key):
-        if key in (keyboard.Key.alt_l, keyboard.Key.alt_gr):
-            self._alt_pressed = True
+        if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+            self._ctrl_pressed = True
         elif key == keyboard.Key.space:
             self._space_pressed = True
             if self.hotkey_pressed:
@@ -129,8 +129,8 @@ class GeminiOverlay:
         return True
 
     def on_release(self, key):
-        if key in (keyboard.Key.alt_l, keyboard.Key.alt_gr):
-            self._alt_pressed = False
+        if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+            self._ctrl_pressed = False
         elif key == keyboard.Key.space:
             self._space_pressed = False
 
@@ -160,8 +160,8 @@ class GeminiOverlay:
         self.response_text.delete("1.0", "end")
         self.response_text.configure(state="disabled")
         self.root.geometry("700x500+200+200")  # Reset to the original static height
-        # Clear conversation history when window is closed
-        self.conversation_history = []
+        # Clear conversation history for API when window is closed
+        self.api_conversation_history = []
 
     def reset_input(self):
         self.input_box.configure(
@@ -207,16 +207,31 @@ class GeminiOverlay:
 
     async def _get_gemini_response(self, query):
         try:
-            response = await model.generate_content_async(query)
+            # Format the prompt with history
+            prompt_with_history = self._build_prompt_with_history(query)
+            response = await model.generate_content_async(prompt_with_history)
             await response.resolve()
             return response.text if response and response.text else "No response"
         except Exception as e:
             return f"Error: {str(e)}"
 
+    def _build_prompt_with_history(self, current_query):
+        """Builds a prompt that includes the current query and previous
+        turns of the conversation with Gemini without displaying on screen
+        """
+        prompt = ""
+        for entry in self.api_conversation_history:
+            prompt += f"User: {entry['query']}\nGemini: {entry['response']}\n"
+        prompt += f"User: {current_query}\nGemini: "
+        return prompt
+
+
     def _fetch_gemini_response(self, query):
         async def async_query():
             try:
-                response = model.generate_content(query)
+                # Format the prompt with history
+                prompt_with_history = self._build_prompt_with_history(query)
+                response = model.generate_content(prompt_with_history)
                 return response.text if response and response.text else "No response"
             except Exception as e:
                 return f"Error: {str(e)}\n{traceback.format_exc()}"
@@ -226,18 +241,17 @@ class GeminiOverlay:
             asyncio.set_event_loop(loop)
             response = loop.run_until_complete(async_query())
             loop.close()
-            self._update_response_panel(response)
+            self._update_response_panel(query, response)
         except Exception as e:
-            self._update_response_panel(f"Error: {str(e)}\n{traceback.format_exc()}")
+            self._update_response_panel(query, f"Error: {str(e)}\n{traceback.format_exc()}")
         finally:
             self.is_loading = False
             self.reset_input()
             self.input_box.focus_set()
 
-    def _update_response_panel(self, response_text):
-        # Add the new conversation entry to history while still maintaining the full history
-        query = self.input_box.get().strip()
-        self.conversation_history.append({
+    def _update_response_panel(self, query, response_text):
+        # Add the new conversation entry to history for the API
+        self.api_conversation_history.append({
             'query': query,
             'response': response_text
         })
@@ -253,7 +267,7 @@ class GeminiOverlay:
         self.response_text.configure(state="disabled")
 
 
-def on_alt_space():
+def on_ctrl_space():
     if not overlay.hotkey_pressed:
         return
     if overlay.is_shown:
@@ -264,5 +278,5 @@ def on_alt_space():
 
 if __name__ == "__main__":
     overlay = GeminiOverlay()
-    with keyboard.GlobalHotKeys({"<alt>+<space>": on_alt_space}) as h:
+    with keyboard.GlobalHotKeys({"<ctrl>+<space>": on_ctrl_space}) as h:
         overlay.root.mainloop()
