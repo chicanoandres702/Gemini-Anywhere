@@ -197,10 +197,6 @@ class GeminiOverlay:
             self.input_box.focus_set()
 
     def _update_response_panel(self, response_text):
-        if not response_text or response_text.startswith("Error:"):
-            self.response_label.configure(text=response_text)
-            return
-
         self.response_label.configure(text=response_text)
         self.root.update_idletasks()
         required_height = self.response_label.winfo_reqheight() + 20
@@ -210,15 +206,18 @@ class GeminiOverlay:
                 self.input_box.winfo_height() +
                 10
         )
-        self._animate_response_panel(required_height)
+        threading.Thread(
+            target=self._animate_response_panel,
+            args=(required_height,),
+            daemon=True
+        ).start()
 
     def _animate_response_panel(self, required_height):
         start_time = time.time()
         start_height = 0
         start_y = self.response_frame.winfo_y()
 
-        def animate_step():
-            nonlocal start_time, start_height, start_y
+        while time.time() - start_time < self.animation_duration:
             elapsed_time = time.time() - start_time
             progress = elapsed_time / self.animation_duration
 
@@ -230,19 +229,16 @@ class GeminiOverlay:
             y = int(start_y + (self.response_frame_y - start_y) * progress)
             self.response_frame.place(relx=0.5, rely=0, y=y, anchor="n")
 
-            if time.time() - start_time < self.animation_duration:
-                self.root.after(10, animate_step)
-            else:
-                self.response_frame_height = required_height
-                self.response_frame.configure(height=self.response_frame_height)
-                self.response_frame.place(
-                    relx=0.5,
-                    rely=0,
-                    y=self.response_frame_y,
-                    anchor="n"
-                )
+            time.sleep(0.01)
 
-        animate_step()
+        self.response_frame_height = required_height
+        self.response_frame.configure(height=self.response_frame_height)
+        self.response_frame.place(
+            relx=0.5,
+            rely=0,
+            y=self.response_frame_y,
+            anchor="n"
+        )
 
 
 def on_alt_space():
