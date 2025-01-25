@@ -8,7 +8,7 @@ setup(
     description="Gemini Overlay Application",
     executables=[
         Executable(
-            "GeminiOverlay.py",  # Change to the filename of your main script
+            "GeminiEverywhere.py",  # Change to the filename of your main script
             base="Win32GUI" if sys.platform == "win32" else None  # Use "Win32GUI" on Windows to suppress console window
         )
     ],
