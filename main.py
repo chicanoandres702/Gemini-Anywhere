@@ -7,6 +7,7 @@ import threading
 import time
 import traceback
 
+# Initialize Google API configuration
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("Please set the GOOGLE_API_KEY environment variable")
@@ -17,27 +18,37 @@ model = genai.GenerativeModel('gemini-pro')
 
 class GeminiOverlay:
     def __init__(self):
+        # Initialize main window settings
         self.root = customtkinter.CTk()
         self.root.title("Gemini Overlay")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
+        self.root.overrideredirect(True)  # Remove window decorations
+        self.root.attributes("-topmost", True)  # Keep window on top
         self.root.attributes("-transparentcolor", "black")
-        self.root.geometry("800x100+200+200")
+        self.root.geometry("800x500+200+200")  # Set a static height
         self.root.configure(fg_color="black")
 
+        # Initialize conversation history
+        self.conversation_history = []  # List to store conversation entries
+
+        # Configuration settings
         self.is_shown = False
         self.fade_step = 0.05
         self.animation_duration = 0.25
-        self.target_height = 100
-        self.target_y = 200
-        self.response_frame_y = 0
-        self.response_frame_height = 0
-        self.is_loading = False
+        self.max_response_height = 400  # Maximum height for response panel
+        self.fixed_response_height = 200  # Fixed response height
+        self.input_box_x = 400  # Location of input box, center of screen (800 px width / 2)
+        self.input_box_y = 30  # Input box location
+        self.is_loading = False  # Initialize the is_loading attribute
+        self.button_width = 150  # Common width for buttons
+        self.button_corner_radius = 8  # Common corner radius for buttons
+        self.button_y_position = 450  # Set the vertical position
 
+        # Initialize UI components and keyboard listener
         self.setup_ui()
         self.setup_keyboard_listener()
 
     def setup_ui(self):
+        # Create and configure the input box with fixed position
         self.input_box = customtkinter.CTkEntry(
             self.root,
             placeholder_text="Ask Gemini...",
@@ -49,32 +60,75 @@ class GeminiOverlay:
             font=("Arial", 14),
             justify="center"
         )
-        self.input_box.place(relx=0.5, rely=0.2, anchor="center")
+        # Place input box at a fixed distance from top instead of using relative positioning
+        self.input_box.place(x=self.input_box_x, y=self.input_box_y, anchor="center")
         self.input_box.bind("<Return>", self.query_gemini)
         self.input_box.bind("<Escape>", self.hide_window)
 
+        # Create main response frame
         self.response_frame = customtkinter.CTkFrame(
             self.root,
             fg_color="gray15",
-            corner_radius=0,
-            width=700,
-            height=0
+            corner_radius=10,  # Add corner radius here
+            width=640,
+            height=self.fixed_response_height
         )
-        self.response_frame.place(relx=0.5, rely=0.5, anchor="n")
+        response_frame_y = self.input_box_y + 15  # Set the vertical position
+        self.response_frame.place(x=self.input_box_x, y=response_frame_y, anchor="n")  # Fix y and keep it below input box
 
-        self.response_label = customtkinter.CTkLabel(
+        # Create scrollable frame for response content
+        self.scrollable_frame = customtkinter.CTkScrollableFrame(
             self.response_frame,
-            text="",
-            wraplength=680,
-            justify="left",
-            font=("Arial", 12),
-            text_color="gray90"
+            width=645,
+            height=self.fixed_response_height - 20,
+            fg_color="gray15",
+            corner_radius=20,  # Add corner radius here
+            scrollbar_button_color="gray30",
+            scrollbar_button_hover_color="gray40"
         )
-        self.response_label.place(relx=0.5, rely=0.1, anchor="n")
+        self.scrollable_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
+        # Create text widget for history display inside scrollable frame
+        self.response_text = customtkinter.CTkTextbox(
+            self.scrollable_frame,
+            width=640,
+            wrap="word",
+            font=("Arial", 12),
+            text_color="gray90",
+            fg_color="transparent",
+            border_width=0,
+            activate_scrollbars=True
+        )
+        self.response_text.pack(expand=True, fill="both", padx=5, pady=5)
+        self.response_text.configure(state="disabled")  # Make text read-only by default
+
+         # Create bottom buttons with common style
+        button_texts = ["Math Tutor", "Blog Writer", "Recipe Finder"]
+        button_x_positions = [
+            150,
+            400,
+            650,
+        ]  # Define x positions for each button for better distribution
+        self.bottom_buttons = []
+        for i, text in enumerate(button_texts):
+            button = customtkinter.CTkButton(
+                self.root,
+                text=text,
+                width=self.button_width,
+                height=30,
+                corner_radius=self.button_corner_radius,
+                fg_color="gray20",
+                hover_color="gray30",
+                text_color="white",
+                font=("Arial", 12),
+            )
+            button.place(x=button_x_positions[i], y=self.button_y_position, anchor="center")
+            self.bottom_buttons.append(button)
+        # Initially hide the window
         self.root.withdraw()
 
     def setup_keyboard_listener(self):
+        # Initialize keyboard tracking variables
         self._alt_pressed = False
         self._space_pressed = False
         self.keyboard_listener = keyboard.Listener(
@@ -108,7 +162,7 @@ class GeminiOverlay:
             self.root.attributes("-alpha", 0.0)
             self.is_shown = True
             threading.Thread(target=self._animate_window, args=(1.0,), daemon=True).start()
-            self.root.after(100, self._set_focus)  # Delay focus to ensure window is ready
+            self.root.after(100, self._set_focus)
 
     def _set_focus(self):
         self.root.focus_force()
@@ -122,14 +176,14 @@ class GeminiOverlay:
             self.is_shown = False
 
     def reset_ui(self):
+        # Reset all UI elements to their initial state
         self.input_box.delete(0, "end")
-        self.response_label.configure(text="")
-        self.target_height = 100
-        self.target_y = 200
-        self.response_frame_height = 0
-        self.response_frame_y = 0
-        self.response_frame.configure(height=0)
-        self.root.geometry(f"800x{self.target_height}+200+{self.target_y}")
+        self.response_text.configure(state="normal")
+        self.response_text.delete("1.0", "end")
+        self.response_text.configure(state="disabled")
+        self.root.geometry("700x500+200+200")  # Reset to the original static height
+        # Clear conversation history when window is closed
+        self.conversation_history = []
 
     def reset_input(self):
         self.input_box.configure(
@@ -160,7 +214,13 @@ class GeminiOverlay:
                 placeholder_text="Loading...",
                 text_color="gray70"
             )
-            self.response_label.configure(text="Loading...")
+            # Update loading state in text widget
+            self.response_text.configure(state="normal")
+            self.response_text.delete("1.0", "end")
+            self.response_text.insert("end", "Loading...")
+            self.response_text.configure(state="disabled")
+
+            # Start response fetch in background
             threading.Thread(
                 target=self._fetch_gemini_response,
                 args=(query,),
@@ -197,48 +257,22 @@ class GeminiOverlay:
             self.input_box.focus_set()
 
     def _update_response_panel(self, response_text):
-        self.response_label.configure(text=response_text)
-        self.root.update_idletasks()
-        required_height = self.response_label.winfo_reqheight() + 20
-        self.response_frame_height = required_height
-        self.response_frame_y = (
-                self.input_box.winfo_y() +
-                self.input_box.winfo_height() +
-                10
-        )
-        threading.Thread(
-            target=self._animate_response_panel,
-            args=(required_height,),
-            daemon=True
-        ).start()
+        # Add the new conversation entry to history while still maintaining the full history
+        query = self.input_box.get().strip()
+        self.conversation_history.append({
+            'query': query,
+            'response': response_text
+        })
 
-    def _animate_response_panel(self, required_height):
-        start_time = time.time()
-        start_height = 0
-        start_y = self.response_frame.winfo_y()
+        # Update the text widget to show only the response
+        self.response_text.configure(state="normal")
+        self.response_text.delete("1.0", "end")
 
-        while time.time() - start_time < self.animation_duration:
-            elapsed_time = time.time() - start_time
-            progress = elapsed_time / self.animation_duration
+        # Display only the response text, without any labels
+        self.response_text.insert("end", response_text)
 
-            self.response_frame_height = int(
-                start_height + (required_height - start_height) * progress
-            )
-            self.response_frame.configure(height=self.response_frame_height)
-
-            y = int(start_y + (self.response_frame_y - start_y) * progress)
-            self.response_frame.place(relx=0.5, rely=0, y=y, anchor="n")
-
-            time.sleep(0.01)
-
-        self.response_frame_height = required_height
-        self.response_frame.configure(height=self.response_frame_height)
-        self.response_frame.place(
-            relx=0.5,
-            rely=0,
-            y=self.response_frame_y,
-            anchor="n"
-        )
+        # Make text read-only again
+        self.response_text.configure(state="disabled")
 
 
 def on_alt_space():
