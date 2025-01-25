@@ -102,28 +102,6 @@ class GeminiOverlay:
         self.response_text.pack(expand=True, fill="both", padx=5, pady=5)
         self.response_text.configure(state="disabled")  # Make text read-only by default
 
-         # Create bottom buttons with common style
-        button_texts = ["Math Tutor", "Blog Writer", "Recipe Finder"]
-        button_x_positions = [
-            150,
-            400,
-            650,
-        ]  # Define x positions for each button for better distribution
-        self.bottom_buttons = []
-        for i, text in enumerate(button_texts):
-            button = customtkinter.CTkButton(
-                self.root,
-                text=text,
-                width=self.button_width,
-                height=30,
-                corner_radius=self.button_corner_radius,
-                fg_color="gray20",
-                hover_color="gray30",
-                text_color="white",
-                font=("Arial", 12),
-            )
-            button.place(x=button_x_positions[i], y=self.button_y_position, anchor="center")
-            self.bottom_buttons.append(button)
         # Initially hide the window
         self.root.withdraw()
 
