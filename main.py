@@ -6,6 +6,7 @@ import os
 import threading
 import time
 import traceback
+import pyperclip
 
 # Initialize Google API configuration
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
@@ -39,7 +40,8 @@ class GeminiOverlay:
         self.input_box_x = 400  # Location of input box, center of screen (800 px width / 2)
         self.input_box_y = 30  # Input box location
         self.is_loading = False  # Initialize the is_loading attribute
-        self.button_width = 150  # Common width for buttons
+        self.button_width = 40  # Common width for buttons
+        self.button_height = 30
         self.button_corner_radius = 8  # Common corner radius for buttons
         self.button_y_position = 450  # Set the vertical position
 
@@ -101,6 +103,19 @@ class GeminiOverlay:
         )
         self.response_text.pack(expand=True, fill="both", padx=5, pady=5)
         self.response_text.configure(state="disabled")  # Make text read-only by default
+
+        # Create copy label with text-based icon
+        self.copy_label = customtkinter.CTkLabel(
+            self.scrollable_frame,
+            text="copy", #Using numbers to draw an icon
+            font=("Arial", 14),  # Set the font size and type
+            text_color="gray70",  # Set the text color
+            cursor="hand2", #Set cursor to hand pointer on hover
+            fg_color="gray20", # Set background color
+            corner_radius=5,
+        )
+        self.copy_label.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
+        self.copy_label.bind("<Button-1>", self.copy_to_clipboard)  # Bind click event
 
         # Initially hide the window
         self.root.withdraw()
@@ -264,6 +279,12 @@ class GeminiOverlay:
         self.response_text.insert("end", response_text)
 
         # Make text read-only again
+        self.response_text.configure(state="disabled")
+
+    def copy_to_clipboard(self, event=None):
+        self.response_text.configure(state="normal")
+        text_to_copy = self.response_text.get("1.0", "end-1c")
+        pyperclip.copy(text_to_copy)
         self.response_text.configure(state="disabled")
 
 
