@@ -15,7 +15,7 @@ setup(
     options={
         "build_exe": {
              "include_files": [],
-             "packages": ["asyncio", "customtkinter", "pynput", "google.generativeai", "os", "threading", "time", "traceback", "pyperclip"]
+             "packages": ["customtkinter", "keyboard", "google.generativeai"]
          }
     }
 )
